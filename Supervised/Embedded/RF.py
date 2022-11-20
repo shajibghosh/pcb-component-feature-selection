@@ -7,7 +7,7 @@ Created on Sun Nov 20 02:25:59 2022
 """Importing the dependencies"""
 import pandas as pd
 import numpy as np
-
+from tqdm import tqdm
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -25,7 +25,7 @@ accuracy = []
 precision = []
 recall = []
 fScore = []
-for id in range(49,53):  
+for id in tqdm(range(49,54)):  
     id = str(id)
     df = pd.read_csv(r'/home/UFAD/shajib.ghosh/pcb-comp-feature-selection/extracted_features/K' + str(k) + '_' + id + '.csv', index_col=0)
     df = df.fillna(0) #'nan'--> 0
@@ -54,7 +54,7 @@ for id in range(49,53):
     rec = recall_score(y_test, y_pred, average='macro')
     fscore = f1_score(y_test, y_pred, average='macro')
     
-    print(f"Generating results for image id : {id}.png")
+    print(f"\nGenerating results for image id : {id}.png")
     print(f"Accuracy: {acc}")
     print(f"Precision: {prec}")
     print(f"Recall: {rec}")
@@ -81,7 +81,7 @@ for id in range(49,53):
     feat_sel_data.to_csv(r'/home/UFAD/shajib.ghosh/pcb-comp-feature-selection/Supervised/Embedded/Results/RF/'+'RF_C_K'+str(k)+'_'+id+'.csv', index = None)
     print(f"Calculation completed for image id: {id}.png")
 
-dictionary = {'image_id': id, 'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1-score': fScore}  
+dictionary = {'image_id': img_id, 'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1-score': fScore}  
 df_results = pd.DataFrame(dictionary) 
 df_results.to_csv(r'/home/UFAD/shajib.ghosh/pcb-comp-feature-selection/Supervised/Embedded/Results/'+ 'RF_C_summary.csv')
 print("Process completed for Feature Selection using Random Forest Classifier.")
