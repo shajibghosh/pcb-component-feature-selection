@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Nov 20 02:25:59 2022
+Created on Mon Dec 26 20:32:51 2022
 
 @author: Shajib Ghosh
 """
@@ -8,24 +8,27 @@ Created on Sun Nov 20 02:25:59 2022
 import pandas as pd
 import numpy as np
 
+from tqdm import tqdm
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
+from sklearn.linear_model import Ridge, RidgeCV
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+import warnings
+warnings.filterwarnings('ignore')
 
 """Constant Declaration"""
 k = 25 
 ts = float(input("Enter test data size (e.g., 0.2 for 20% test data): "))    
 seed = 2022
-n_est = 10000
+n_est = 1000
 
 """Main Calculation"""
 img_id = []
-accuracy = []
-precision = []
-recall = []
-fScore = []
-for id in range(49,53):  
+mse = []
+mae = []
+R2_Score = []
+for id in tqdm(range(49,64)):  
     id = str(id)
     df = pd.read_csv(r'/home/UFAD/shajib.ghosh/CompStat_Feature_Selection/extracted_features/K' + str(k) + '_' + id + '.csv', index_col=0)
     df = df.fillna(0) #'nan'--> 0
@@ -45,28 +48,27 @@ for id in range(49,53):
     X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=ts,random_state=seed)
 
     # Instantiate model 
-    rf=RandomForestClassifier(n_estimators=n_est,n_jobs=-1,random_state=seed)
-     
-    rf.fit(X_train,y_train)
-    y_pred = rf.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred, average='macro')
-    rec = recall_score(y_test, y_pred, average='macro')
-    fscore = f1_score(y_test, y_pred, average='macro')
-    
-    print(f"Generating results for image id : {id}.png")
-    print(f"Accuracy: {acc}")
-    print(f"Precision: {prec}")
-    print(f"Recall: {rec}")
-    print(f"F1-Score: {fscore}")
+    ridge = RidgeCV(alphas=np.arange(0.00001, 1, 0.05), cv=10)
+    ridge.fit(X, y)
+    print("\nBest alpha value: ", ridge.alpha_)
+    RidgeReg = Ridge(alpha=ridge.alpha_, max_iter=n_est)
+    RidgeReg.fit(X_train,y_train) 
+    y_pred = RidgeReg.predict(X_test)
+    mean_sqr_err = mean_squared_error(y_test, y_pred)
+    mean_abs_err = mean_absolute_error(y_test, y_pred)
+    r2_Score = r2_score(y_test, y_pred)
+
+    print(f"\nGenerating results for image id : {id}.png")
+    print(f"Mean squared error (MSE): {mean_sqr_err}")
+    print(f"Mean absolute error (MAE): {mean_abs_err}")
+    print(f"R2 Score: {r2_Score}")
 
     img_id.append(id)
-    accuracy.append(acc)
-    precision.append(prec)
-    recall.append(rec)
-    fScore.append(fscore)
+    mse.append(mean_sqr_err)
+    mae.append(mean_abs_err)
+    R2_Score.append(r2_Score)
 
-    importances=rf.feature_importances_
+    importances=np.abs(RidgeReg.coef_)
     indices=np.argsort(importances)[::-1] 
     
     list_feat = []
@@ -78,10 +80,10 @@ for id in range(49,53):
         
     c={"feature" : list_feat, "importance" : list_imp_score}
     feat_sel_data = pd.DataFrame(c)
-    feat_sel_data.to_csv(r'/home/UFAD/shajib.ghosh/CompStat_Feature_Selection/Supervised/Embedded/Results/RF/'+'RF_C_K'+str(k)+'_'+id+'.csv', index = None)
+    feat_sel_data.to_csv(r'/home/UFAD/shajib.ghosh/CompStat_Feature_Selection/Supervised/Embedded/Results/Ridge/'+'Ridge_K'+str(k)+'_'+id+'.csv', index = None)
     print(f"Calculation completed for image id: {id}.png")
 
-dictionary = {'image_id': id, 'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1-score': fScore}  
+dictionary = {'image_id': img_id, 'mean_squared_error': mse, 'mean_absolute_error': mae, 'r2_score': R2_Score}  
 df_results = pd.DataFrame(dictionary) 
-df_results.to_csv(r'/home/UFAD/shajib.ghosh/CompStat_Feature_Selection/Supervised/Embedded/Results/'+ 'RF_C_summary.csv')
-print("Process completed for Feature Selection using Random Forest Classifier.")
+df_results.to_csv(r'/home/UFAD/shajib.ghosh/CompStat_Feature_Selection/Supervised/Embedded/Results/'+ 'Ridge_Regression_summary.csv')
+print("Process completed for Feature Selection using Ridge Regression.")
