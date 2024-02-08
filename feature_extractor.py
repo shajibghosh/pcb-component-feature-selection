@@ -81,28 +81,29 @@ def extract_shape_features_within_polygon(image, polygon_coords):
     # Iterate through contours
     for contour in contours:
         # Calculate area and perimeter
-        area += cv2.contourArea(contour)
-        perimeter += cv2.arcLength(contour, True)
+        if len(contour) >= 5:
+            area += cv2.contourArea(contour)
+            perimeter += cv2.arcLength(contour, True)
 
-        # Convex hull
-        convex_hull = cv2.convexHull(contour)
+            # Convex hull
+            convex_hull = cv2.convexHull(contour)
 
-        # Solidity (area of contour / area of convex hull)
-        hull_area = cv2.contourArea(convex_hull)
-        if hull_area != 0:
-            solidity += cv2.contourArea(contour) / hull_area
+            # Solidity (area of contour / area of convex hull)
+            hull_area = cv2.contourArea(convex_hull)
+            if hull_area != 0:
+                solidity += cv2.contourArea(contour) / hull_area
 
-        # Convexity (perimeter of contour / perimeter of convex hull)
-        hull_perimeter = cv2.arcLength(convex_hull, True)
-        if hull_perimeter != 0:
-            convexity += cv2.arcLength(contour, True) / hull_perimeter
+            # Convexity (perimeter of contour / perimeter of convex hull)
+            hull_perimeter = cv2.arcLength(convex_hull, True)
+            if hull_perimeter != 0:
+                convexity += cv2.arcLength(contour, True) / hull_perimeter
 
-        # Eccentricity
-        _, (w, h), _ = cv2.fitEllipse(contour)
-        eccentricity += (w / h) ** 2
+            # Eccentricity
+            _, (w, h), _ = cv2.fitEllipse(contour)
+            eccentricity += (w / h) ** 2
 
-        # Aspect ratio
-        aspect_ratio += w / h
+            # Aspect ratio
+            aspect_ratio += w / h
 
     # Calculate circularity
     if perimeter != 0 and area != 0:
