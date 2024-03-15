@@ -1,8 +1,12 @@
+# Author: Shajib Ghosh
+# Date: 2024-03-14
+# Time: 03:34 UTC
+
 import os
 import cv2
 import numpy as np
 from skimage.feature import graycomatrix
-from skimage import color
+from skimage import color as skimage_color
 import pandas as pd
 from tqdm import tqdm
 
@@ -13,7 +17,10 @@ def yolo_to_polygon(yolo_box, image_size):
 
 def extract_glcm_features(image, distances, angles):
     if len(image.shape) == 3:
-        gray_image = color.rgb2gray(image)
+        gray_image = skimage_color.rgb2gray(image)
+    elif len(image.shape) == 4:  # Check if the image has an alpha channel
+        image = image[:, :, :3]  # Drop the alpha channel
+        gray_image = skimage_color.rgb2gray(image)
     else:
         gray_image = image
 
@@ -122,11 +129,43 @@ def extract_shape_features_within_polygon(image, polygon_coords):
 
     return {"Area": area, "Perimeter": perimeter, "Circularity": circularity, "Solidity": solidity, "Convexity": convexity, "Eccentricity": eccentricity, "Aspect_Ratio": aspect_ratio}
 
+
+def extract_color_features_within_polygon(image, polygon_coords, bins=8):
+    # Create a mask for the polygon
+    mask = np.zeros(image.shape[:2], dtype="uint8")
+    cv2.fillPoly(mask, np.array([polygon_coords], dtype=np.int32), 255)
+
+    # Function to calculate color histograms for each channel in a color space
+    def calc_color_hist(image, color_space, mask, bins):
+        color_features = {}
+        for i, col in enumerate(['Channel_1', 'Channel_2', 'Channel_3']):
+            hist = cv2.calcHist([image], [i], mask, [bins], [0, 256])
+            hist = cv2.normalize(hist, hist).flatten()
+            for j in range(bins):
+                color_features[f"{color_space}_{col}_hist_bin_{j}"] = hist[j]
+        return color_features
+
+    # Convert image to different color spaces and calculate histograms
+    color_spaces = {
+        'RGB': cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
+        'HSV': cv2.cvtColor(image, cv2.COLOR_BGR2HSV),
+        'HLS': cv2.cvtColor(image, cv2.COLOR_BGR2HLS),
+        'LAB': cv2.cvtColor(image, cv2.COLOR_BGR2Lab),
+        'LUV': cv2.cvtColor(image, cv2.COLOR_BGR2Luv),
+        'YCrCb': cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb),
+        'XYZ': cv2.cvtColor(image, cv2.COLOR_BGR2XYZ),
+    }
+    color_features = {}
+    for space, img in color_spaces.items():
+        color_features.update(calc_color_hist(img, space, mask, bins))
+
+    return color_features
+
 def main():
     parent_folder = os.getcwd()
-    images_folder = os.path.join(parent_folder, 'images')
-    annotations_folder = os.path.join(parent_folder, 'annotations')
-    output_folder = os.path.join(parent_folder, 'extracted_features')
+    images_folder = os.path.join(parent_folder, 'images_fpic')  #images_fpic, images
+    annotations_folder = os.path.join(parent_folder, 'smd_fpic_anns_yolo') #smd_anns_fpic, annotations
+    output_folder = os.path.join(parent_folder, 'extracted_feats_fpic') #extracted_feats_fpic, extracted_features
 
     # Create the output folder if it doesn't exist
     os.makedirs(output_folder, exist_ok=True)
@@ -161,15 +200,16 @@ def main():
                 # Extract shape features
                 shape_features = extract_shape_features_within_polygon(image, polygon_coords)
 
+                # Extract color features
+                color_features = extract_color_features_within_polygon(image, polygon_coords)
+
                 # Combine texture and shape features
-                combined_features = {"Component_ID": i + 1, "Class_ID": class_id, **texture_features, **shape_features}
+                combined_features = {"Component_ID": i + 1, "Class_ID": class_id, **color_features, **texture_features, **shape_features}
                 features_list.append(combined_features)
 
             # Create a DataFrame for this image and save it to CSV
             output_csv_path = os.path.join(output_folder, f"{os.path.splitext(filename)[0]}_features.csv")
-            columns = ["Component_ID", "Class_ID", "GLCM_Contrast", "GLCM_Correlation", "GLCM_Energy", "GLCM_Homogeneity", "Tamura_Contrast", "Tamura_Coarseness", "Tamura_Directionality", "Entropy", "Area", "Perimeter", "Circularity", "Solidity", "Convexity", "Eccentricity", "Aspect_Ratio"]
-            df = pd.DataFrame(features_list, columns=columns)
-
+            df = pd.DataFrame(features_list)
             # Save the DataFrame to CSV
             df.to_csv(output_csv_path, index=False)
 
